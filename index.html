@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Block Brawlers</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#83d7f5;font-family:system-ui,Arial;color:white;touch-action:none}
+canvas{display:block;width:100vw;height:100vh}
+#hud{position:fixed;inset:10px 12px auto;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;text-shadow:2px 2px #25324a;font-weight:900}
+.pill{background:#202b45d9;border:2px solid #fff7;border-radius:12px;padding:7px 10px;margin-bottom:6px}
+#help{position:fixed;top:68px;left:12px;font-size:12px;opacity:.92;text-shadow:1px 1px #26334a;pointer-events:none}
+#controls{position:fixed;inset:auto 0 14px;display:flex;justify-content:space-between;align-items:end;padding:0 18px;pointer-events:none}
+.pad{display:grid;grid-template-columns:54px 54px 54px;grid-template-rows:48px 48px 48px;gap:4px;pointer-events:auto}
+.btn{border:2px solid #ffffff9c;border-radius:13px;background:#1d2a49b8;color:white;font-weight:900;font-size:20px;display:flex;align-items:center;justify-content:center;user-select:none}
+#up{grid-column:2}#left{grid-column:1;grid-row:2}#down{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
+.actions{display:flex;gap:9px;pointer-events:auto;align-items:end}.action{width:68px;height:68px;border-radius:50%;font-size:12px;background:#ed594d;box-shadow:0 4px #87372f}.super{background:#ffca35;color:#382d15;box-shadow:0 4px #a87514}
+#overlay{position:fixed;inset:0;background:#17243ad9;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+.panel{max-width:480px;background:#273653;border:3px solid #ffffffaa;border-radius:22px;padding:24px;box-shadow:0 8px #111b2e}
+h1{margin:0 0 8px;font-size:clamp(28px,6vw,46px);color:#ffdb4d;text-shadow:3px 3px #8e4b29}
+p{line-height:1.45}.start{border:0;border-radius:12px;padding:13px 25px;font-size:18px;font-weight:900;background:#68d66f;color:#17351b}
+@media(min-width:800px){.pad{transform:scale(1.08);transform-origin:bottom left}.action{width:76px;height:76px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><div><div class="pill">🟩 BLOCK BRAWLERS</div><div class="pill" id="hp">❤️❤️❤️</div></div><div><div class="pill" id="score">⭐ 0</div><div class="pill" id="wave">Враги: 3</div></div></div>
+<div id="help">Двигайся • атакуй • собери очки</div>
+<div id="controls">
+ <div class="pad">
+  <div class="btn" id="up">▲</div><div class="btn" id="left">◀</div><div class="btn" id="down">▼</div><div class="btn" id="right">▶</div>
+ </div>
+ <div class="actions"><div class="btn action" id="attack">УДАР</div><div class="btn action super" id="super">СУПЕР</div></div>
+</div>
+<div id="overlay"><div class="panel"><h1>BLOCK BRAWLERS</h1><div>Блочная арена • динамичные бои</div><p>Побеждай противников на арене в пиксельно-блочном мире. Управление — кнопками на экране.</p><button class="start" id="play">ИГРАТЬ</button></div></div>
+<script>
+(()=> {
+const c=document.getElementById('game'),ctx=c.getContext('2d');
+let W=innerWidth,H=innerHeight,scale=1;
+function resize(){W=innerWidth;H=innerHeight;c.width=Math.floor(W*devicePixelRatio);c.height=Math.floor(H*devicePixelRatio);ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
+addEventListener('resize',resize);resize();
+let player={x:0,y:0,hp:3,dir:0}, enemies=[], score=0, playing=false, attackT=0, superT=0, flash=0;
+const keys={};let last=0;
+function spawn(){enemies=[];for(let i=0;i<3+Math.min(5,Math.floor(score/5));i++)enemies.push({x:(Math.random()-.5)*1.5,y:(Math.random()-.5)*1.2,hp:2,phase:Math.random()*6})}
+function reset(){player={x:0,y:0,hp:3,dir:0};score=0;attackT=0;superT=0;spawn();playing=true;document.getElementById('overlay').style.display='none';hud()}
+function hud(){document.getElementById('hp').textContent='❤️'.repeat(Math.max(0,player.hp))||'💔';document.getElementById('score').textContent='⭐ '+score;document.getElementById('wave').textContent='Враги: '+enemies.length}
+document.getElementById('play').onclick=reset;
+function bind(id,key){let el=document.getElementById(id);const on=e=>{e.preventDefault();keys[key]=true};const off=e=>{e.preventDefault();keys[key]=false};el.addEventListener('pointerdown',on);['pointerup','pointercancel','pointerleave'].forEach(n=>el.addEventListener(n,off))}
+bind('up','up');bind('down','down');bind('left','left');bind('right','right');
+document.getElementById('attack').addEventListener('pointerdown',e=>{e.preventDefault();attackT=.28});
+document.getElementById('super').addEventListener('pointerdown',e=>{e.preventDefault();if(superT<=0){superT=1.1;attackT=.8;enemies.forEach(q=>q.hp-=2);flash=.3}});
+function project(x,y,z=0){let horizon=H*.32,depth=1.7+y*.3;let f=Math.min(W,H)*.62/depth;return {x:W/2+x*f,y:horizon+(y+0.65)*f-z*f,w:f}}
+function block(x,y,z,size,color){let p=project(x,y,z),s=p.w*size;ctx.fillStyle=color;ctx.fillRect(p.x-s/2,p.y-s,s,s);ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(p.x-s/2,p.y-s,s*.25,s);ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(p.x+s*.25,p.y-s,s*.25,s)}
+function draw(){ctx.clearRect(0,0,W,H);
+let sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#73c9f2');sky.addColorStop(.52,'#d5f5ff');sky.addColorStop(.53,'#80bd58');sky.addColorStop(1,'#417b3c');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#6aa84f';ctx.beginPath();ctx.moveTo(W*.14,H*.34);ctx.lineTo(W*.86,H*.34);ctx.lineTo(W*1.1,H);ctx.lineTo(-W*.1,H);ctx.closePath();ctx.fill();
+for(let i=-5;i<=5;i++){let p=project(i*.28,.8);ctx.strokeStyle='#ffffff18';ctx.beginPath();ctx.moveTo(p.x,H*.34);ctx.lineTo(W/2+i*W*.14,H);ctx.stroke()}
+for(let i=0;i<6;i++){let x=(i%3-1)*.9,y=.1+Math.floor(i/3)*.45;block(x,y,.05,.22,['#8a9ba5','#638f48','#8a9ba5'][i%3])}
+let objs=enemies.map(e=>({x:e.x,y:e.y,e})).concat([{x:player.x,y:player.y,p:true}]).sort((a,b)=>a.y-b.y);
+for(const o of objs){let isP=o.p,x=o.x,y=o.y;let bob=isP?Math.sin(Date.now()/180)*.018:Math.sin(Date.now()/160+o.e.phase)*.02;
+block(x,y,.18+bob,.17,isP?'#32a9ff':'#e94e55');block(x,y,.35+bob,.17,isP?'#f2c7a1':'#f3bd83');let p=project(x,y,.35+bob),s=p.w*.17;ctx.fillStyle='#293449';ctx.fillRect(p.x-s*.34,p.y-s*.67,s*.18,s*.16);ctx.fillRect(p.x+s*.12,p.y-s*.67,s*.18,s*.16);
+if(!isP){ctx.fillStyle='#25334a';ctx.fillRect(p.x-s/2,p.y-s*1.08,s,4);ctx.fillStyle='#7dff71';ctx.fillRect(p.x-s/2,p.y-s*1.08,s*Math.max(0,o.e.hp/2),4)}}
+if(attackT>0){let p=project(player.x+Math.sin(player.dir)*.22,player.y+Math.cos(player.dir)*.22,.3);ctx.strokeStyle=superT>0?'#ffdc42':'#fff';ctx.lineWidth=5;ctx.beginPath();ctx.arc(p.x,p.y,Math.min(W,H)*.08,0,Math.PI*1.5);ctx.stroke()}
+if(flash>0){ctx.fillStyle='#ffe46a55';ctx.fillRect(0,0,W,H)}
+}
+function update(dt){if(!playing)return;let vx=0,vy=0;if(keys.left)vx-=1;if(keys.right)vx+=1;if(keys.up)vy-=1;if(keys.down)vy+=1;if(vx||vy){let l=Math.hypot(vx,vy);player.x+=vx/l*dt*.75;player.y+=vy/l*dt*.75;player.dir=Math.atan2(vx,-vy)}player.x=Math.max(-.8,Math.min(.8,player.x));player.y=Math.max(-.55,Math.min(.55,player.y));
+attackT=Math.max(0,attackT-dt);superT=Math.max(0,superT-dt);flash=Math.max(0,flash-dt);
+for(let e of enemies){let dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy)||1;if(d>.18){e.x+=dx/d*dt*.16;e.y+=dy/d*dt*.16}else if(Math.random()<dt*.45){player.hp--;hud();if(player.hp<=0){playing=false;document.getElementById('overlay').style.display='flex';document.querySelector('h1').textContent='ИГРА ОКОНЧЕНА';document.querySelector('.panel p').textContent='Счёт: '+score+'. Нажми кнопку, чтобы попробовать ещё раз.';document.getElementById('play').textContent='ЕЩЁ РАЗ'}}}
+if(attackT>0){for(let e of enemies){if(Math.hypot(player.x-e.x,player.y-e.y)<.42){e.hp-=dt*5}}}
+let old=enemies.length;enemies=enemies.filter(e=>e.hp>0);if(enemies.length<old){score+=old-enemies.length;hud()}if(!enemies.length){spawn();hud()} }
+function loop(t){let dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+})();
+</script>
+</body></html>
